@@ -1,0 +1,194 @@
+AWSTemplateFormatVersion: '2010-09-09'
+##############################
+#        Parameters          #
+##############################
+Parameters:
+  RolesStack:
+    Description: Name of the CloudFormation stack defining roles
+    Type: String
+    Default: HazelCastRoles
+    MinLength: 1
+
+  VPC:
+    Description: VPC target group
+    Type: AWS::EC2::VPC::Id
+
+  LBSubnets:
+    Description: Loadbalancer subnet list 
+    Type: List<AWS::EC2::Subnet::Id>
+
+  LBScheme:
+    Description: Loadbalancer scheme
+    Type: String
+    Default: internal
+    AllowedValues:
+      - internal
+      - internet-facing
+
+  SrvSubnets:
+    Description: Service subnet list 
+    Type: List<AWS::EC2::Subnet::Id>
+
+  ContainerImage:
+    Description: Image to be deployed  
+    Type: String
+    Default: diegojunior/aws-ecs-fargate
+
+  ContainerPort:
+    Description: Container listen port
+    Type: Number
+    Default: 8080
+
+##############################
+#        Resources           #
+##############################
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: 
+        !Join
+        - '-'
+        - -  !Ref AWS::StackName
+          -  Cluster
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name:
+        !Join
+        - '-'
+        - -  !Ref AWS::StackName
+          -  'LoadBalancer'
+      Type: network
+      Scheme: !Ref LBScheme
+      Subnets: !Ref LBSubnets
+
+  TargetGroup:
+    DependsOn: LoadBalancer
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name:
+        !Join
+        - '-'
+        - -  !Ref AWS::StackName
+          -  'TargetGroup'
+      Port: !Ref ContainerPort
+      Protocol: TCP
+      VpcId: !Ref VPC
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 10
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '5'
+      TargetType: ip
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: TCP
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName:
+        !Join
+        - '-'
+        - -  !Ref AWS::StackName
+          -  'SecurityGroup'    
+      GroupDescription: Allow http to client host
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: !Ref ContainerPort
+          ToPort: !Ref ContainerPort
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 5701
+          ToPort: 5708
+          CidrIp: 0.0.0.0/0
+
+  Service:
+    DependsOn: Listener
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: 
+        !Join
+        - '-'
+        - -  !Ref AWS::StackName
+          -  'Service'    
+      Cluster: !Ref ECSCluster
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 2
+      HealthCheckGracePeriodSeconds: 10
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref SecurityGroup
+          Subnets: !Ref SrvSubnets
+      LoadBalancers:
+        - ContainerName: 
+            !Join
+              - '-'
+              - -  !Ref AWS::StackName
+                -  'Container'
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref TargetGroup
+      SchedulingStrategy: REPLICA
+      TaskDefinition: !Ref TaskDefinition
+
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        - Name: 
+            !Join
+            - '-'
+            - -  !Ref AWS::StackName
+              -  'Container'
+          Image: !Ref ContainerImage
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+          MemoryReservation: 1024
+          Essential: true
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-create-group: "true"
+              awslogs-region: !Sub "${AWS::Region}"
+              awslogs-group: !Sub "${AWS::StackName}"
+              awslogs-stream-prefix: !Sub "${AWS::StackName}"
+      Family: !Sub "${AWS::StackName}-family"
+      NetworkMode: awsvpc
+      Cpu: 1024
+      Memory: 4096
+      TaskRoleArn: 
+        Fn::ImportValue:
+          !Sub "${RolesStack}-TaskRole"
+      ExecutionRoleArn: 
+        Fn::ImportValue:
+          !Sub "${RolesStack}-ExecutionRole"
+      RequiresCompatibilities:
+        - FARGATE
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 1
+      LogGroupName: !Sub "${AWS::StackName}"
+
+##############################
+#          Outputs           #
+##############################
+Outputs:
+  LoadBalancerUrl:
+    Description: The URL of the LB
+    Value: !GetAtt LoadBalancer.DNSName

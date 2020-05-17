@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+# aws cloudformation create-stack \
+# --stack-name HazelCastRoles \
+# --template-body file://hazelCastRole.yaml \
+# --capabilities CAPABILITY_IAM
+
+Resources:
+  HazelTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: HazelTaskExecution
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - ecs:ListTasks
+                  - ecs:DescribeTasks
+                  - ec2:DescribeNetworkInterfaces
+                  - logs:CreateLogGroup
+  HazelExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+
+Outputs:
+  TaskRole:
+    Value: !GetAtt HazelTaskRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-TaskRole"
+  ExecutionRole:
+    Value: !GetAtt HazelExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ExecutionRole"

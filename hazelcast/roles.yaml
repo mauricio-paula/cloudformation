@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 
-# aws cloudformation create-stack \
-# --stack-name HazelCastRoles \
-# --template-body file://hazelCastRole.yaml \
-# --capabilities CAPABILITY_IAM
+ # aws cloudformation create-stack \
+ # --stack-name HazelCastRoles \
+ # --template-body file://roles.yaml \
+ # --capabilities CAPABILITY_IAM
 
 Resources:
   HazelTaskRole:

@@ -6,6 +6,72 @@ AWSTemplateFormatVersion: '2010-09-09'
  # --capabilities CAPABILITY_IAM
 
 Resources:
+
+  ECSforEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ECSforECSPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: "*"
+                Effect: Allow
+                Action:
+                  - ec2:DescribeTags
+                  - ecs:CreateCluster
+                  - ecs:DeregisterContainerInstance
+                  - ecs:DiscoverPollEndpoint
+                  - ecs:Poll
+                  - ecs:RegisterContainerInstance
+                  - ecs:StartTelemetrySession
+                  - ecs:UpdateContainerInstancesState
+                  - ecs:Submit*
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+
+  ECSAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Action:
+            - "sts:AssumeRole"
+          Effect: Allow
+          Principal:
+            Service:
+              - application-autoscaling.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: ecs-service-autoscaling
+          PolicyDocument:
+            Statement:
+              Effect: Allow
+              Action:
+                - application-autoscaling:*
+                - cloudwatch:DescribeAlarms
+                - cloudwatch:PutMetricAlarm
+                - ecs:DescribeServices
+                - ecs:UpdateService
+              Resource: "*"
+
   HazelTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -29,6 +95,7 @@ Resources:
                   - ecs:DescribeTasks
                   - ec2:DescribeNetworkInterfaces
                   - logs:CreateLogGroup
+
   HazelExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -44,11 +111,28 @@ Resources:
         - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 
 Outputs:
+
   TaskRole:
     Value: !GetAtt HazelTaskRole.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-TaskRole"
+      Name: !Sub "${AWS::StackName}-ECSTaskRole"
+
   ExecutionRole:
     Value: !GetAtt HazelExecutionRole.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-ExecutionRole"
+      Name: !Sub "${AWS::StackName}-ECSExecutionRole"
+
+  ECSforEC2RoleArn:
+    Value: !GetAtt ECSforEC2Role.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSforEC2RoleArn"
+
+  ECSforEC2Role:
+    Value: !Ref ECSforEC2Role
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSforEC2Role"
+
+  ECSAutoScalingRole:
+    Value: !GetAtt ECSAutoScalingRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSAutoScalingRole"

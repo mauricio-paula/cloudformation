@@ -112,13 +112,23 @@ Resources:
 
 Outputs:
 
-  TaskRole:
+  TaskRoleArn:
     Value: !GetAtt HazelTaskRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSTaskRoleArn"
+
+  TaskRole:
+    Value: !Ref HazelTaskRole
     Export:
       Name: !Sub "${AWS::StackName}-ECSTaskRole"
 
-  ExecutionRole:
+  ExecutionRoleArn:
     Value: !GetAtt HazelExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSExecutionRoleArn"
+
+  ExecutionRole:
+    Value: !Ref HazelExecutionRole
     Export:
       Name: !Sub "${AWS::StackName}-ECSExecutionRole"
 
@@ -132,7 +142,12 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-ECSforEC2Role"
 
-  ECSAutoScalingRole:
+  ECSAutoScalingRoleArn:
     Value: !GetAtt ECSAutoScalingRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSAutoScalingRoleArn"
+
+  ECSAutoScalingRole:
+    Value: !Ref ECSAutoScalingRole
     Export:
       Name: !Sub "${AWS::StackName}-ECSAutoScalingRole"
